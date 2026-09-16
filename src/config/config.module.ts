@@ -3,8 +3,9 @@ import { ConfigModule as NestConfigModule } from "@nestjs/config";
 import * as path from "node:path";
 import { validateEnv } from "./env.validation";
 
-// Resolved relative to this file (not process.cwd()) so config loads
-// correctly regardless of which directory the process is started from.
+// .env is located at the project root.
+// This file is: src/config/config.module.ts
+// ../../.env goes from src/config -> src -> project root
 const ENV_FILE_PATH = path.resolve(__dirname, "../../.env");
 
 @Module({
