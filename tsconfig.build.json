@@ -1,4 +1,13 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "paths": {
+      "@email-platform/types": ["packages/types/dist/index.d.ts"],
+      "@email-platform/types/*": ["packages/types/dist/*"],
+      "@email-platform/email": ["packages/email/dist/index.d.ts"],
+      "@email-platform/email/*": ["packages/email/dist/*"]
+    }
+  },
   "exclude": ["node_modules", "dist", "test", "**/*.spec.ts"]
 }

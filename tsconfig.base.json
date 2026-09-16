@@ -17,11 +17,7 @@
       "@email-platform/types": ["packages/types/src"],
       "@email-platform/types/*": ["packages/types/src/*"],
       "@email-platform/email": ["packages/email/src"],
-      "@email-platform/email/*": ["packages/email/src/*"],
-      "@email-platform/ui": ["packages/ui/src"],
-      "@email-platform/ui/*": ["packages/ui/src/*"],
-      "@email-platform/config": ["packages/config/src"],
-      "@email-platform/config/*": ["packages/config/src/*"]
+      "@email-platform/email/*": ["packages/email/src/*"]
     }
   }
 }
