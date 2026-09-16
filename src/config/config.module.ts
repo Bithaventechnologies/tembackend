@@ -3,10 +3,9 @@ import { ConfigModule as NestConfigModule } from "@nestjs/config";
 import * as path from "node:path";
 import { validateEnv } from "./env.validation";
 
-// .env is located at the project root.
-// This file is: src/config/config.module.ts
-// ../../.env goes from src/config -> src -> project root
-const ENV_FILE_PATH = path.resolve(__dirname, "../../.env");
+// Commands are run from the repository root in local development and on Render.
+// Unlike __dirname, process.cwd() does not move when TypeScript is compiled to dist/.
+const ENV_FILE_PATH = path.resolve(process.cwd(), ".env");
 
 @Module({
   imports: [

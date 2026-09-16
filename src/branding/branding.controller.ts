@@ -19,6 +19,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { STORAGE_SERVICE, type StorageService } from "../storage/storage.service";
 import { Inject } from "@nestjs/common";
 import { validateImageUpload } from "../storage/file-validation";
+import type { UploadedFile as MulterUploadedFile } from "../common/types/uploaded-file.type";
 
 @Controller("branding")
 @UseGuards(CsrfGuard)
@@ -46,7 +47,7 @@ export class BrandingController {
   @UseInterceptors(FileInterceptor("file"))
   async uploadLogo(
     @CurrentUser() user: AuthenticatedUser,
-    @UploadedFile() file: Express.Multer.File | undefined,
+    @UploadedFile() file: MulterUploadedFile | undefined,
   ): Promise<FileAsset> {
     if (!file) throw new BadRequestException("No file uploaded");
     const mimeType = await validateImageUpload(file.buffer, file.mimetype);

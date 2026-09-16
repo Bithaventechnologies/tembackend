@@ -22,6 +22,7 @@ import { CsrfGuard } from "../auth/guards/csrf.guard";
 import { PrismaService } from "../prisma/prisma.service";
 import { STORAGE_SERVICE, type StorageService } from "../storage/storage.service";
 import { validateImageUpload } from "../storage/file-validation";
+import type { UploadedFile as MulterUploadedFile } from "../common/types/uploaded-file.type";
 
 @Controller("signatures")
 @UseGuards(CsrfGuard)
@@ -66,7 +67,7 @@ export class SignaturesController {
   @UseInterceptors(FileInterceptor("file"))
   async uploadImage(
     @CurrentUser() user: AuthenticatedUser,
-    @UploadedFile() file: Express.Multer.File | undefined,
+    @UploadedFile() file: MulterUploadedFile | undefined,
   ): Promise<FileAsset> {
     if (!file) throw new BadRequestException("No file uploaded");
     const mimeType = await validateImageUpload(file.buffer, file.mimetype);
