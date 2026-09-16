@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": false,
+    "sourceMap": true,
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "paths": {
+      "@email-platform/types": ["packages/types/src"],
+      "@email-platform/types/*": ["packages/types/src/*"],
+      "@email-platform/email": ["packages/email/src"],
+      "@email-platform/email/*": ["packages/email/src/*"],
+      "@email-platform/ui": ["packages/ui/src"],
+      "@email-platform/ui/*": ["packages/ui/src/*"],
+      "@email-platform/config": ["packages/config/src"],
+      "@email-platform/config/*": ["packages/config/src/*"]
+    }
+  }
+}

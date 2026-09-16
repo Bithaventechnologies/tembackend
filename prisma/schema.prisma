@@ -1,0 +1,593 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Organization (multi-tenancy scaffold — single default org used in v1)
+// ────────────────────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members        OrganizationMember[]
+  categories     EmailCategory[]
+  recipients     Recipient[]
+  recipientLists RecipientList[]
+  campaigns      Campaign[]
+  branding       EmailBranding?
+  signatures     EmailSignature[]
+  fileAssets     FileAsset[]
+  auditLogs      AuditLog[]
+  suppressions   SuppressionEntry[]
+  emailMessages  EmailMessage[]
+}
+
+model OrganizationMember {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  adminUserId    String
+  adminUser      AdminUser    @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  role           OrgRole      @default(ADMIN)
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, adminUserId])
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Auth
+// ────────────────────────────────────────────────────────────────────────────
+
+model AdminUser {
+  id                  String    @id @default(cuid())
+  email               String    @unique
+  passwordHash        String
+  name                String
+  isActive            Boolean   @default(true)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  lastLoginAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  sessions             AdminSession[]
+  memberships          OrganizationMember[]
+  passwordResetTokens  PasswordResetToken[]
+  loginAttempts        LoginAttempt[]
+  createdTemplates     EmailTemplate[]        @relation("TemplateCreatedBy")
+  auditLogs            AuditLog[]
+  campaignsCreated     Campaign[]             @relation("CampaignCreatedBy")
+
+  @@index([email])
+}
+
+model AdminSession {
+  id           String    @id @default(cuid())
+  adminUserId  String
+  adminUser    AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  tokenHash    String    @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([adminUserId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  adminUserId String
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([adminUserId])
+}
+
+model LoginAttempt {
+  id          String     @id @default(cuid())
+  email       String
+  success     Boolean
+  ipAddress   String?
+  userAgent   String?
+  adminUserId String?
+  adminUser   AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Categories / Templates / Versions / Variables
+// ────────────────────────────────────────────────────────────────────────────
+
+model EmailCategory {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  slug           String
+  description    String?
+  isActive       Boolean      @default(true)
+  deletedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  templates EmailTemplate[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+model EmailTemplate {
+  id             String       @id @default(cuid())
+  organizationId String
+  categoryId     String
+  category       EmailCategory @relation(fields: [categoryId], references: [id])
+  name           String
+  classification TemplateClassification @default(TRANSACTIONAL)
+  status         TemplateStatus @default(DRAFT)
+  createdById    String
+  createdBy      AdminUser    @relation("TemplateCreatedBy", fields: [createdById], references: [id])
+  currentVersionId String?    @unique
+  currentVersion   TemplateVersion? @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  deletedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  versions    TemplateVersion[] @relation("TemplateVersions")
+  variables   TemplateVariable[]
+  campaigns   Campaign[]
+
+  @@index([organizationId])
+  @@index([categoryId])
+  @@index([status])
+}
+
+enum TemplateClassification {
+  TRANSACTIONAL
+  MARKETING
+}
+
+enum TemplateStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+// Immutable snapshot each time a template is edited & published.
+// Campaigns/EmailMessages reference a specific version so historical sends never change.
+model TemplateVersion {
+  id            String   @id @default(cuid())
+  templateId    String
+  template      EmailTemplate @relation("TemplateVersions", fields: [templateId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  subject       String
+  previewText   String?
+  bodyBlocksJson Json    // structured block-editor document (source of truth)
+  bodyHtml      String   @db.Text // rendered email-safe HTML (compiled from blocks)
+  bodyText      String   @db.Text // plain-text fallback
+  createdAt     DateTime @default(now())
+
+  currentFor    EmailTemplate? @relation("CurrentVersion")
+  campaigns     Campaign[]
+  emailMessages EmailMessage[]
+
+  @@unique([templateId, versionNumber])
+  @@index([templateId])
+}
+
+model TemplateVariable {
+  id          String        @id @default(cuid())
+  templateId  String
+  template    EmailTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  key         String        // e.g. "firstName"
+  label       String        // e.g. "First Name"
+  isRequired  Boolean       @default(false)
+  defaultValue String?
+  source      VariableSource @default(RECIPIENT)
+  createdAt   DateTime      @default(now())
+
+  @@unique([templateId, key])
+  @@index([templateId])
+}
+
+enum VariableSource {
+  RECIPIENT   // comes from recipient/custom fields
+  SYSTEM      // currentDate, etc.
+  BRANDING    // companyName, signature
+  CUSTOM      // set at compose time
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Recipients / Lists
+// ────────────────────────────────────────────────────────────────────────────
+
+model Recipient {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  email          String
+  firstName      String?
+  lastName       String?
+  company        String?
+  phone          String?
+  customFields   Json?
+  status         RecipientStatus @default(ACTIVE)
+  deletedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  listMemberships   RecipientListMember[]
+  campaignRecipients CampaignRecipient[]
+  emailMessages      EmailMessage[]
+  suppressionEntries SuppressionEntry[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId, email])
+  @@index([status])
+}
+
+enum RecipientStatus {
+  ACTIVE
+  INVALID
+  BOUNCED
+  UNSUBSCRIBED
+  SUPPRESSED
+}
+
+model RecipientList {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  deletedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  members   RecipientListMember[]
+  campaigns Campaign[]
+
+  @@index([organizationId])
+}
+
+model RecipientListMember {
+  id              String        @id @default(cuid())
+  recipientListId String
+  recipientList   RecipientList @relation(fields: [recipientListId], references: [id], onDelete: Cascade)
+  recipientId     String
+  recipient       Recipient     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  addedAt         DateTime      @default(now())
+
+  @@unique([recipientListId, recipientId])
+  @@index([recipientId])
+}
+
+model SuppressionEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  recipientId    String?
+  recipient      Recipient?   @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  email          String
+  reason         SuppressionReason
+  detail         String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([organizationId, email])
+  @@index([organizationId, email])
+}
+
+enum SuppressionReason {
+  HARD_BOUNCE
+  COMPLAINT
+  UNSUBSCRIBE
+  MANUAL
+  INVALID_EMAIL
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Campaigns / Email sending
+// ────────────────────────────────────────────────────────────────────────────
+
+model Campaign {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name              String
+  templateId        String
+  template          EmailTemplate @relation(fields: [templateId], references: [id])
+  templateVersionId String
+  templateVersion   TemplateVersion @relation(fields: [templateVersionId], references: [id])
+  recipientListId   String?
+  recipientList     RecipientList? @relation(fields: [recipientListId], references: [id])
+  brandingSnapshotId String?
+  brandingSnapshot  EmailBrandingVersion? @relation(fields: [brandingSnapshotId], references: [id])
+  signatureSnapshotId String?
+  signatureSnapshot EmailSignatureVersion? @relation(fields: [signatureSnapshotId], references: [id])
+  status            CampaignStatus @default(DRAFT)
+  idempotencyKey    String?      @unique
+  totalRecipients   Int          @default(0)
+  createdById       String
+  createdBy         AdminUser    @relation("CampaignCreatedBy", fields: [createdById], references: [id])
+  createdAt         DateTime     @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  cancelledAt       DateTime?
+
+  campaignRecipients CampaignRecipient[]
+  emailMessages      EmailMessage[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  QUEUED
+  SENDING
+  COMPLETED
+  PARTIALLY_FAILED
+  FAILED
+  CANCELLED
+}
+
+// Snapshot linking a recipient to a campaign at creation time (before jobs are enqueued)
+model CampaignRecipient {
+  id           String    @id @default(cuid())
+  campaignId   String
+  campaign     Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  recipientId  String
+  recipient    Recipient @relation(fields: [recipientId], references: [id])
+  variablesJson Json     // resolved variable values for this recipient at send time
+  createdAt    DateTime  @default(now())
+
+  emailMessage EmailMessage?
+
+  @@unique([campaignId, recipientId])
+  @@index([campaignId])
+}
+
+model EmailMessage {
+  id                  String       @id @default(cuid())
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaignId          String?
+  campaign            Campaign?    @relation(fields: [campaignId], references: [id])
+  campaignRecipientId String?      @unique
+  campaignRecipient   CampaignRecipient? @relation(fields: [campaignRecipientId], references: [id])
+  recipientId         String
+  recipient           Recipient    @relation(fields: [recipientId], references: [id])
+  templateVersionId   String?
+  templateVersion     TemplateVersion? @relation(fields: [templateVersionId], references: [id])
+
+  // Content snapshot — immutable record of exactly what was sent
+  fromEmail    String
+  fromName     String
+  replyTo      String?
+  subject      String
+  bodyHtml     String   @db.Text
+  bodyText     String   @db.Text
+
+  status           EmailStatus @default(QUEUED)
+  providerMessageId String?    @unique
+  failureReason    String?
+  failureType      FailureType?
+  retryCount       Int         @default(0)
+  isTest           Boolean     @default(false)
+
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  firstOpenedAt DateTime?
+  lastOpenedAt  DateTime?
+  openCount     Int          @default(0)
+  firstClickedAt DateTime?
+  lastClickedAt  DateTime?
+  clickCount     Int         @default(0)
+  bouncedAt     DateTime?
+  failedAt      DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  events EmailEvent[]
+
+  @@index([organizationId])
+  @@index([campaignId])
+  @@index([recipientId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum EmailStatus {
+  QUEUED
+  PROCESSING
+  SENT
+  DELIVERED
+  FAILED
+  BOUNCED
+  OPENED
+  CLICKED
+  SUPPRESSED
+  CANCELLED
+}
+
+enum FailureType {
+  TRANSIENT
+  PERMANENT
+  UNKNOWN
+}
+
+model EmailEvent {
+  id               String       @id @default(cuid())
+  emailMessageId   String
+  emailMessage     EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+  eventType        EmailEventType
+  providerEventId  String?      @unique
+  timestamp        DateTime
+  metadataJson     Json?
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime     @default(now())
+
+  @@index([emailMessageId])
+  @@index([eventType])
+}
+
+enum EmailEventType {
+  SENT
+  DELIVERED
+  DELIVERY_DELAYED
+  BOUNCED
+  FAILED
+  OPENED
+  CLICKED
+  COMPLAINED
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Branding / Signatures (versioned like templates for snapshot integrity)
+// ────────────────────────────────────────────────────────────────────────────
+
+model EmailBranding {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyName    String
+  websiteUrl     String?
+  supportEmail   String?
+  phone          String?
+  address        String?
+  primaryColor   String       @default("#111827")
+  secondaryColor String       @default("#6366F1")
+  footerText     String?
+  socialLinksJson Json?
+  logoAssetId    String?
+  logoAsset      FileAsset?   @relation(fields: [logoAssetId], references: [id])
+  currentVersionId String?    @unique
+  currentVersion   EmailBrandingVersion? @relation("CurrentBrandingVersion", fields: [currentVersionId], references: [id])
+  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime     @default(now())
+
+  versions EmailBrandingVersion[] @relation("BrandingVersions")
+}
+
+// Immutable snapshot taken whenever branding changes, referenced by campaigns
+model EmailBrandingVersion {
+  id             String   @id @default(cuid())
+  brandingId     String
+  branding       EmailBranding @relation("BrandingVersions", fields: [brandingId], references: [id], onDelete: Cascade)
+  snapshotJson   Json
+  createdAt      DateTime @default(now())
+
+  currentFor EmailBranding? @relation("CurrentBrandingVersion")
+  campaigns  Campaign[]
+
+  @@index([brandingId])
+}
+
+model EmailSignature {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  jobTitle       String?
+  department     String?
+  email          String?
+  phone          String?
+  website        String?
+  address        String?
+  socialLinksJson Json?
+  profileImageAssetId String?
+  profileImageAsset   FileAsset? @relation(fields: [profileImageAssetId], references: [id])
+  isDefault      Boolean      @default(false)
+  currentVersionId String?    @unique
+  currentVersion   EmailSignatureVersion? @relation("CurrentSignatureVersion", fields: [currentVersionId], references: [id])
+  deletedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  versions EmailSignatureVersion[] @relation("SignatureVersions")
+
+  @@index([organizationId])
+}
+
+model EmailSignatureVersion {
+  id           String  @id @default(cuid())
+  signatureId  String
+  signature    EmailSignature @relation("SignatureVersions", fields: [signatureId], references: [id], onDelete: Cascade)
+  snapshotJson Json
+  renderedHtml String  @db.Text
+  createdAt    DateTime @default(now())
+
+  currentFor EmailSignature? @relation("CurrentSignatureVersion")
+  campaigns  Campaign[]
+
+  @@index([signatureId])
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Files / Audit
+// ────────────────────────────────────────────────────────────────────────────
+
+model FileAsset {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  key            String       // storage key/path
+  url            String
+  mimeType       String
+  sizeBytes      Int
+  width          Int?
+  height         Int?
+  originalName   String
+  createdAt      DateTime     @default(now())
+
+  brandingLogos    EmailBranding[]
+  signatureImages  EmailSignature[]
+
+  @@index([organizationId])
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actorId        String?
+  actor          AdminUser?   @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action         String
+  resourceType   String
+  resourceId     String?
+  ipAddress      String?
+  metadataJson   Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@index([resourceType, resourceId])
+}

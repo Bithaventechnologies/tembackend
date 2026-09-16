@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.next/
+.turbo/
+/apps/api/storage/
+*.log
+.env
+.env.local
+.env.development
+.env.production
+!.env.example
+.DS_Store
+coverage/
+*.tsbuildinfo
+.claude/
