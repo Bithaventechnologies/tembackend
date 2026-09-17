@@ -31,11 +31,22 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  const corsOrigin = config.get<string>("API_CORS_ORIGIN", "http://localhost:3000");
-  app.enableCors({
-    origin: corsOrigin.split(",").map((o) => o.trim()),
-    credentials: true,
-  });
+const corsOrigins = config
+  .get<string>("API_CORS_ORIGIN", "http://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.enableCors({
+  origin: corsOrigins,
+  credentials: true,
+  methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-CSRF-Token",
+  ],
+});
 
   const storageLocalDir = path.resolve(config.get<string>("STORAGE_LOCAL_DIR", "./storage"));
   app.use("/uploads", express.static(storageLocalDir));
