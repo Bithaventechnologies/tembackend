@@ -28,7 +28,6 @@ describe("AuthService login lockout", () => {
         }),
       },
       loginAttempt: { create: jest.fn().mockResolvedValue({}) },
-      adminSession: { create: jest.fn().mockResolvedValue({}) },
       passwordResetToken: { create: jest.fn() },
       $transaction: jest.fn(),
     };
@@ -70,7 +69,6 @@ describe("AuthService login lockout", () => {
         }),
       },
       loginAttempt: { create: jest.fn().mockResolvedValue({}) },
-      adminSession: { create: jest.fn().mockResolvedValue({}) },
     };
     const audit = { log: jest.fn() };
 

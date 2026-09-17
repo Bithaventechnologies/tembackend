@@ -5,7 +5,6 @@ import {
   Get,
   Post,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
@@ -14,7 +13,6 @@ import { BrandingService } from "./branding.service";
 import { UpdateBrandingDto } from "./dto/branding.dto";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import type { AuthenticatedUser } from "../auth/auth.types";
-import { CsrfGuard } from "../auth/guards/csrf.guard";
 import { PrismaService } from "../prisma/prisma.service";
 import { STORAGE_SERVICE, type StorageService } from "../storage/storage.service";
 import { Inject } from "@nestjs/common";
@@ -22,7 +20,6 @@ import { validateImageUpload } from "../storage/file-validation";
 import type { UploadedFile as MulterUploadedFile } from "../common/types/uploaded-file.type";
 
 @Controller("branding")
-@UseGuards(CsrfGuard)
 export class BrandingController {
   constructor(
     private readonly brandingService: BrandingService,

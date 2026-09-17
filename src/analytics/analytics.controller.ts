@@ -1,11 +1,9 @@
-import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
+import { Controller, Get, Param, Query } from "@nestjs/common";
 import { AnalyticsService } from "./analytics.service";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import type { AuthenticatedUser } from "../auth/auth.types";
-import { CsrfGuard } from "../auth/guards/csrf.guard";
 
 @Controller("analytics")
-@UseGuards(CsrfGuard)
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 

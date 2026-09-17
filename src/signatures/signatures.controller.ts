@@ -9,7 +9,6 @@ import {
   Patch,
   Post,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
@@ -18,14 +17,12 @@ import { SignaturesService } from "./signatures.service";
 import { CreateSignatureDto, UpdateSignatureDto } from "../branding/dto/branding.dto";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import type { AuthenticatedUser } from "../auth/auth.types";
-import { CsrfGuard } from "../auth/guards/csrf.guard";
 import { PrismaService } from "../prisma/prisma.service";
 import { STORAGE_SERVICE, type StorageService } from "../storage/storage.service";
 import { validateImageUpload } from "../storage/file-validation";
 import type { UploadedFile as MulterUploadedFile } from "../common/types/uploaded-file.type";
 
 @Controller("signatures")
-@UseGuards(CsrfGuard)
 export class SignaturesController {
   constructor(
     private readonly signaturesService: SignaturesService,

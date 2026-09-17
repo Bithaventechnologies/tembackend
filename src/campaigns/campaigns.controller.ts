@@ -1,13 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query } from "@nestjs/common";
 import type { Campaign } from "@prisma/client";
 import { CampaignsService } from "./campaigns.service";
 import { CreateCampaignDto, SendCampaignDto } from "./dto/campaign.dto";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import type { AuthenticatedUser } from "../auth/auth.types";
-import { CsrfGuard } from "../auth/guards/csrf.guard";
 
 @Controller("campaigns")
-@UseGuards(CsrfGuard)
 export class CampaignsController {
   constructor(private readonly campaignsService: CampaignsService) {}
 
