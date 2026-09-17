@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import type { EmailTemplate, TemplateVersion } from "@prisma/client";
 import { TemplatesService } from "./templates.service";
 import {
@@ -9,10 +9,8 @@ import {
 } from "./dto/template.dto";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import type { AuthenticatedUser } from "../auth/auth.types";
-import { CsrfGuard } from "../auth/guards/csrf.guard";
 
 @Controller("templates")
-@UseGuards(CsrfGuard)
 export class TemplatesController {
   constructor(private readonly templatesService: TemplatesService) {}
 

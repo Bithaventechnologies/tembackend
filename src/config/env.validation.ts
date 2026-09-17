@@ -7,10 +7,6 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().min(1),
 
-  SESSION_SECRET: z.string().min(1),
-  COOKIE_DOMAIN: z.string().min(1).default("localhost"),
-  COOKIE_SECURE: z.enum(["true", "false"]).default("false"),
-
   RESEND_API_KEY: z.string().min(1),
   RESEND_WEBHOOK_SECRET: z.string().min(1),
   RESEND_FROM_EMAIL: z.string().email(),

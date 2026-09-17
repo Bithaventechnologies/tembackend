@@ -66,7 +66,6 @@ model AdminUser {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  sessions             AdminSession[]
   memberships          OrganizationMember[]
   passwordResetTokens  PasswordResetToken[]
   loginAttempts        LoginAttempt[]
@@ -75,21 +74,6 @@ model AdminUser {
   campaignsCreated     Campaign[]             @relation("CampaignCreatedBy")
 
   @@index([email])
-}
-
-model AdminSession {
-  id           String    @id @default(cuid())
-  adminUserId  String
-  adminUser    AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
-  tokenHash    String    @unique
-  ipAddress    String?
-  userAgent    String?
-  expiresAt    DateTime
-  revokedAt    DateTime?
-  createdAt    DateTime  @default(now())
-
-  @@index([adminUserId])
-  @@index([expiresAt])
 }
 
 model PasswordResetToken {

@@ -10,7 +10,6 @@ import {
   Query,
   Res,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
@@ -28,13 +27,11 @@ import {
 import { PaginationQueryDto } from "../common/dto/pagination.dto";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import type { AuthenticatedUser } from "../auth/auth.types";
-import { CsrfGuard } from "../auth/guards/csrf.guard";
 import { validateCsvUpload } from "../storage/file-validation";
 import { AuditService } from "../audit/audit.service";
 import type { UploadedFile as MulterUploadedFile } from "../common/types/uploaded-file.type";
 
 @Controller("recipients")
-@UseGuards(CsrfGuard)
 export class RecipientsController {
   constructor(
     private readonly recipientsService: RecipientsService,
