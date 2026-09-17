@@ -3,6 +3,7 @@ import { NestFactory } from "@nestjs/core";
 import { ConfigService } from "@nestjs/config";
 import { ValidationPipe } from "@nestjs/common";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import * as express from "express";
 import * as path from "node:path";
 import { AppModule } from "./app.module";
@@ -16,6 +17,7 @@ async function bootstrap(): Promise<void> {
   const config = app.get(ConfigService);
 
   app.use(helmet());
+  app.use(cookieParser());
   // Raw body must be captured BEFORE JSON parsing consumes the stream, and
   // ONLY for the webhook route — every other route gets normal JSON parsing.
   app.use(
@@ -28,9 +30,14 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
+  const corsOrigins = config.get<string>("API_CORS_ORIGIN", "http://localhost:3000")
+    .split(",")
+    .map((origin) => origin.trim());
   app.enableCors({
-    origin: ["http://localhost:3000", "https://www.panteracapital.us"],
+    origin: corsOrigins,
+    credentials: true,
     methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
   });
 
   const storageLocalDir = path.resolve(config.get<string>("STORAGE_LOCAL_DIR", "./storage"));

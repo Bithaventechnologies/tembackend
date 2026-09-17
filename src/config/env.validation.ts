@@ -23,6 +23,8 @@ export const envSchema = z.object({
 
   API_PORT: z.coerce.number().int().positive().optional(),
   API_CORS_ORIGIN: z.string().min(1),
+  COOKIE_DOMAIN: z.string().min(1).default("localhost"),
+  COOKIE_SECURE: z.enum(["true", "false"]).default("false"),
 
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
   LOGIN_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(900),

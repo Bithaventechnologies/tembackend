@@ -4,4 +4,5 @@ export interface AuthenticatedUser {
   name: string;
   organizationId: string;
   role: "OWNER" | "ADMIN" | "MEMBER";
+  sessionId: string;
 }

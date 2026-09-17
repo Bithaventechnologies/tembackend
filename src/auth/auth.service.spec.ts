@@ -69,6 +69,7 @@ describe("AuthService login lockout", () => {
         }),
       },
       loginAttempt: { create: jest.fn().mockResolvedValue({}) },
+      adminSession: { create: jest.fn().mockResolvedValue({}) },
     };
     const audit = { log: jest.fn() };
 

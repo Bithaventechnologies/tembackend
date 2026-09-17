@@ -1,12 +1,16 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as argon2 from "argon2";
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { generateOpaqueToken, hashToken, SESSION_TTL_MS } from "./session.util";
 import type { AdminUser } from "@prisma/client";
 
 export interface LoginResult {
+  sessionToken: string;
+  csrfToken: string;
+  expiresAt: Date;
   user: {
     id: string;
     email: string;
@@ -69,6 +73,19 @@ export class AuthService {
     });
     await this.recordAttempt(normalizedEmail, true, ipAddress, userAgent, user.id);
 
+    const sessionToken = generateOpaqueToken();
+    const csrfToken = randomBytes(24).toString("base64url");
+    const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+    await this.prisma.adminSession.create({
+      data: {
+        adminUserId: user.id,
+        tokenHash: hashToken(sessionToken),
+        ipAddress: ipAddress ?? null,
+        userAgent: userAgent ?? null,
+        expiresAt,
+      },
+    });
+
     await this.audit.log({
       actorId: user.id,
       action: "auth.login",
@@ -78,8 +95,18 @@ export class AuthService {
     });
 
     return {
+      sessionToken,
+      csrfToken,
+      expiresAt,
       user: { id: user.id, email: user.email, name: user.name },
     };
+  }
+
+  async logout(sessionId: string): Promise<void> {
+    await this.prisma.adminSession.update({
+      where: { id: sessionId },
+      data: { revokedAt: new Date() },
+    });
   }
 
   private async handleFailedLogin(user: AdminUser): Promise<void> {
@@ -120,11 +147,11 @@ export class AuthService {
     // leaking which emails are registered.
     if (!user) return;
 
-    const rawToken = randomBytes(32).toString("base64url");
+    const rawToken = generateOpaqueToken();
     await this.prisma.passwordResetToken.create({
       data: {
         adminUserId: user.id,
-        tokenHash: this.hashResetToken(rawToken),
+        tokenHash: hashToken(rawToken),
         expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
       },
     });
@@ -136,7 +163,7 @@ export class AuthService {
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
-    const tokenHash = this.hashResetToken(token);
+    const tokenHash = hashToken(token);
     const resetToken = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
 
     if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
@@ -154,6 +181,10 @@ export class AuthService {
         where: { id: resetToken.id },
         data: { usedAt: new Date() },
       }),
+      this.prisma.adminSession.updateMany({
+        where: { adminUserId: resetToken.adminUserId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
     ]);
 
     await this.audit.log({
@@ -164,7 +195,4 @@ export class AuthService {
     });
   }
 
-  private hashResetToken(token: string): string {
-    return createHash("sha256").update(token).digest("hex");
-  }
 }
