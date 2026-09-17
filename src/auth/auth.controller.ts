@@ -14,14 +14,19 @@ import type { AuthenticatedUser } from "./auth.types";
 @Controller("auth")
 export class AuthController {
   private readonly cookieSecure: boolean;
-  private readonly cookieDomain: string;
+  private readonly cookieDomain?: string;
 
   constructor(
     private readonly authService: AuthService,
     private readonly config: ConfigService,
   ) {
     this.cookieSecure = this.config.get<string>("COOKIE_SECURE") === "true";
-    this.cookieDomain = this.config.get<string>("COOKIE_DOMAIN", "localhost");
+    const configuredDomain = this.config.get<string>("COOKIE_DOMAIN", "").trim();
+    // A cookie domain only scopes subdomains of the API host; it cannot make a
+    // cookie available to localhost or another unrelated frontend domain.
+    this.cookieDomain = configuredDomain && configuredDomain !== "localhost"
+      ? configuredDomain
+      : undefined;
   }
 
   @Public()
@@ -42,8 +47,10 @@ export class AuthController {
 
     const cookieOptions = {
       secure: this.cookieSecure,
-      sameSite: "lax" as const,
-      domain: this.cookieDomain === "localhost" ? undefined : this.cookieDomain,
+      // localhost and onrender.com are cross-site. Lax cookies are withheld
+      // from credentialed fetch/XHR requests between them.
+      sameSite: "none" as const,
+      domain: this.cookieDomain,
       maxAge: SESSION_TTL_MS,
       path: "/",
     };

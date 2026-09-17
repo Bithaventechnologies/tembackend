@@ -23,7 +23,9 @@ export const envSchema = z.object({
 
   API_PORT: z.coerce.number().int().positive().optional(),
   API_CORS_ORIGIN: z.string().min(1),
-  COOKIE_DOMAIN: z.string().min(1).default("localhost"),
+  // Leave blank to issue host-only cookies. This is required when a frontend
+  // and API do not share a parent domain (for example localhost -> Render).
+  COOKIE_DOMAIN: z.string().optional().default(""),
   COOKIE_SECURE: z.enum(["true", "false"]).default("false"),
 
   LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
