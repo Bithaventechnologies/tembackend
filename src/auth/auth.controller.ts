@@ -40,22 +40,21 @@ export class AuthController {
       req.header("user-agent"),
     );
 
-  res.cookie(SESSION_COOKIE_NAME, result.sessionToken, {
+res.cookie(SESSION_COOKIE_NAME, result.sessionToken, {
   httpOnly: true,
-  secure: true,
-  sameSite: "none",
+  secure: this.cookieSecure,
+  sameSite: this.cookieSecure ? "none" : "lax",
   maxAge: SESSION_TTL_MS,
   path: "/",
 });
 
 res.cookie(CSRF_COOKIE_NAME, result.csrfToken, {
   httpOnly: false,
-  secure: true,
-  sameSite: "none",
+  secure: this.cookieSecure,
+  sameSite: this.cookieSecure ? "none" : "lax",
   maxAge: SESSION_TTL_MS,
   path: "/",
 });
-
     return { user: result.user };
   }
 
